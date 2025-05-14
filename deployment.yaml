@@ -2,18 +2,45 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: landing-page-deployment
+  labels:
+    app: landing-page
 spec:
   replicas: 3
   selector:
     matchLabels:
       app: landing-page
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   template:
     metadata:
       labels:
         app: landing-page
     spec:
       containers:
-      - name: landing-page
-        image: sanhasanali/landing-page:latest 
+      - name: landing-page-container
+        image: sanhasanali/landing-page:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 80
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "64Mi"
+          limits:
+            cpu: "250m"
+            memory: "128Mi"
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 3
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 15
