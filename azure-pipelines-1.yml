@@ -18,7 +18,7 @@ stages:
     steps:
     - task: AzureCLI@2
       inputs:
-        azureSubscription: 'azure-spn'
+        azureSubscription: 'conn-landing'
         scriptType: 'bash'
         scriptLocation: 'inlineScript'
         inlineScript: |
