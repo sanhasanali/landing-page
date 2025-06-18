@@ -1,19 +1,59 @@
-# Starter pipeline
-# Start with a minimal pipeline that you can customize to build and deploy your code.
-# Add steps that build, run tests, deploy, and more:
-# https://aka.ms/yaml
-
 trigger:
-- master
+  branches:
+    include:
+      - master
 
-pool:
-  vmImage: ubuntu-latest
+variables:
+  imageName: 'landing-page'
+  acrLoginServer: 'myacrlanding.azurecr.io'
+  kubernetesNamespace: 'default'
 
-steps:
-- script: echo Hello, world!
-  displayName: 'Run a one-line script'
+stages:
+- stage: Build
+  displayName: 'Build and Push Docker Image'
+  jobs:
+  - job: Build
+    displayName: 'Build and Push Image to ACR'
+    pool:
+      name: default
+    steps:
+    - checkout: self
 
-- script: |
-    echo Add other tasks to build, test, and deploy your project.
-    echo See https://aka.ms/yaml
-  displayName: 'Run a multi-line script'
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: 'conn-landing'  # Ganti dengan nama service connection kamu
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "🔐 Login ke ACR"
+          az acr login --name myacrlogin
+
+          echo "🐳 Build Docker Image"
+          docker build -t $(acrLoginServer)/$(imageName):$(Build.BuildId) .
+
+          echo "🚀 Push ke ACR"
+          docker push $(acrLoginServer)/$(imageName):$(Build.BuildId)
+
+- stage: Deploy
+  displayName: 'Deploy to AKS'
+  dependsOn: Build
+  jobs:
+  - job: Deploy
+    displayName: 'Deploy to AKS via kubectl'
+    pool:
+      name: default
+    steps:
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: 'conn-landing'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "📦 Get kubeconfig dari AKS"
+          az aks get-credentials --resource-group rs-group-landing --name myaks-landing --overwrite-existing
+
+          echo "📦 Update image pada deployment"
+          kubectl set image deployment/landing-page landing-page=$(acrLoginServer)/$(imageName):$(Build.BuildId) -n $(kubernetesNamespace)
+
+          echo "✅ Deployment selesai"
+
