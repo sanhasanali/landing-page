@@ -15,23 +15,23 @@ stages:
   - job: Build
     displayName: 'Build and Push Image to ACR'
     pool:
-      name: default
+      name: default  # Pastikan ini adalah nama agent pool tempat self-hosted agent kamu berada
     steps:
     - checkout: self
 
     - task: AzureCLI@2
       inputs:
-        azureSubscription: 'conn-landing'  # Ganti dengan nama service connection kamu
+        azureSubscription: 'conn-landing'  # Ganti dengan nama service connection kamu (sudah benar)
         scriptType: 'bash'
         scriptLocation: 'inlineScript'
         inlineScript: |
-          echo "🔐 Login ke ACR"
-          az acr login --name myacrlogin
+          echo "🔐 Login ke Azure Container Registry"
+          az acr login --name myacrlanding
 
           echo "🐳 Build Docker Image"
           docker build -t $(acrLoginServer)/$(imageName):$(Build.BuildId) .
 
-          echo "🚀 Push ke ACR"
+          echo "🚀 Push Docker Image ke ACR"
           docker push $(acrLoginServer)/$(imageName):$(Build.BuildId)
 
 - stage: Deploy
@@ -41,7 +41,7 @@ stages:
   - job: Deploy
     displayName: 'Deploy to AKS via kubectl'
     pool:
-      name: default
+      name: default  # Sama seperti di atas, harus cocok dengan agent pool kamu
     steps:
     - task: AzureCLI@2
       inputs:
@@ -49,11 +49,10 @@ stages:
         scriptType: 'bash'
         scriptLocation: 'inlineScript'
         inlineScript: |
-          echo "📦 Get kubeconfig dari AKS"
+          echo "📦 Mengambil kubeconfig dari AKS"
           az aks get-credentials --resource-group rs-group-landing --name myaks-landing --overwrite-existing
 
-          echo "📦 Update image pada deployment"
+          echo "📦 Update image pada deployment di Kubernetes"
           kubectl set image deployment/landing-page landing-page=$(acrLoginServer)/$(imageName):$(Build.BuildId) -n $(kubernetesNamespace)
 
-          echo "✅ Deployment selesai"
-
+          echo "✅ Deployment ke AKS selesai"
